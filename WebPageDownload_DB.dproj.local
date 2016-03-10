@@ -1,0 +1,11 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<BorlandProject>
+	<Transactions>
+    <Transaction>2016/02/26 16:58:28.000.677,=C:\Users\Jeff\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2016/02/26 17:00:02.000.604,=C:\Users\Jeff\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2016/03/01 10:46:56.000.853,=C:\Users\Jeff\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2016/03/01 11:05:28.000.929,C:\Users\Jeff\Documents\Embarcadero\Studio\Projects\Unit1.dfm=C:\Users\Jeff\Desktop\球探網網頁自動下載程式-資料庫\Unit1.dfm</Transaction>
+    <Transaction>2016/03/01 11:05:28.000.929,C:\Users\Jeff\Documents\Embarcadero\Studio\Projects\Unit1.pas=C:\Users\Jeff\Desktop\球探網網頁自動下載程式-資料庫\Unit1.pas</Transaction>
+    <Transaction>2016/03/01 11:05:57.000.580,C:\Users\Jeff\Documents\Embarcadero\Studio\Projects\Project1.dproj=C:\Users\Jeff\Desktop\球探網網頁自動下載程式-資料庫\WebPageDownload_DB.dproj</Transaction>
+  </Transactions>
+</BorlandProject>

@@ -1,0 +1,418 @@
+unit Unit1;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, DALoader, MyLoader, Data.DB, MemDS,
+  DBAccess, MyAccess, Vcl.Menus, Vcl.ExtCtrls, Vcl.StdCtrls, Vcl.OleCtrls,
+  SHDocVw, Vcl.Samples.Spin, Vcl.ComCtrls;
+
+type
+  TSport = (soccer, nba);
+
+  TTableData = record
+    Sport:string;
+    ChangeTime:TDateTime;
+    trID:string;
+    trData:WideString;
+  end;
+
+  TFullData = record
+    Sport:string;
+    ChangeTime:TDateTime;
+    Data:WideString;
+  end;
+
+  TTableDataArray = array of TTableData;
+
+type
+  TForm1 = class(TForm)
+    pnl2: TPanel;
+    pgc1: TPageControl;
+    ts_soccer: TTabSheet;
+    pnl1: TPanel;
+    lbl2: TLabel;
+    lbl12: TLabel;
+    edt_soccer: TEdit;
+    btn_soccer: TButton;
+    se_soccer: TSpinEdit;
+    chk_soccer: TCheckBox;
+    wb_soccer: TWebBrowser;
+    btn1: TButton;
+    mm_soccer: TMemo;
+    ts_nba: TTabSheet;
+    pnl7: TPanel;
+    lbl7: TLabel;
+    lbl13: TLabel;
+    edt_nba: TEdit;
+    btn_nba: TButton;
+    chk_nba: TCheckBox;
+    se_nba: TSpinEdit;
+    wb_nba: TWebBrowser;
+    mm_nba: TMemo;
+    tmr_soccer: TTimer;
+    tmr_nba: TTimer;
+    mm1: TMainMenu;
+    N1: TMenuItem;
+    FTP1: TMenuItem;
+    MyConnection1: TMyConnection;
+    Button1: TButton;
+    ml_LiveTableData: TMyLoader;
+    ml_LiveFullData: TMyLoader;
+    MyQuery1: TMyQuery;
+    procedure FormCreate(Sender: TObject);
+    procedure ml_LiveTableDataPutData(Sender: TDALoader);
+    procedure ml_LiveFullDataPutData(Sender: TDALoader);
+    procedure tmr_soccerTimer(Sender: TObject);
+    procedure tmr_nbaTimer(Sender: TObject);
+    procedure Button1Click(Sender: TObject);
+  private
+    { Private declarations }
+  public
+    { Public declarations }
+    function MD5(const fileName:string):string;
+    function isChanged(sport:TSport):Boolean;
+    function getLiveTable(sport:TSport):WideString;
+    function getElementById(const Doc: IDispatch; const Id: string): IDispatch;
+    function getWebBrowserHTML(const WebBrowser: TWebBrowser): WideString;
+    function saveToFile(sport:TSport):Boolean;
+    function getSportFileName(sport:TSport):string;
+    function getLastSportFileName(sport:TSport):string;
+    function getSportName(sport:TSport):string;
+    function getSportWebBrowser(sport:TSport):TWebBrowser;
+    procedure writeMemo(sport:TSport;content:Widestring);
+    function writeDB(sport:TSport):boolean;
+    procedure doFetch(sport:TSport);
+  end;
+
+var
+  Form1: TForm1;
+  TableDataArray:TTableDataArray;
+  FullData:TFullData;
+
+implementation
+
+uses ActiveX,mshtml,IdHashMessageDigest, idHash;
+
+{$R *.dfm}
+
+procedure TForm1.FormCreate(Sender: TObject);
+begin
+  wb_soccer.Navigate(trim(edt_soccer.Text));
+end;
+
+function TForm1.MD5(const fileName:string):string;
+var
+  IdMD5: TIdHashMessageDigest5;
+  FS: TFileStream;
+begin
+  IdMD5 := TIdHashMessageDigest5.Create;
+  FS := TFileStream.Create(FileName, fmOpenRead or fmShareDenyWrite);
+  try
+    Result := IdMD5.HashStreamAsHex(FS)
+  finally
+    FS.Free;
+    IdMD5.Free;
+  end;
+end;
+
+procedure TForm1.ml_LiveFullDataPutData(Sender: TDALoader);
+begin
+  ml_LiveFullData.PutColumnData('Sport', 1, FullData.Sport);
+  ml_LiveFullData.PutColumnData('ChangeTime', 1, FullData.ChangeTime);
+  ml_LiveFullData.PutColumnData('Data', 1, FullData.Data);
+end;
+
+procedure TForm1.ml_LiveTableDataPutData(Sender: TDALoader);
+var
+  i:Integer;
+begin
+  for i := 0 to Length(TableDataArray)-1 do
+  begin
+    ml_LiveTableData.PutColumnData('Sport', i+1, TableDataArray[i].Sport);
+    ml_LiveTableData.PutColumnData('ChangeTime', i+1, TableDataArray[i].ChangeTime);
+    ml_LiveTableData.PutColumnData('trID', i+1, TableDataArray[i].trID);
+    ml_LiveTableData.PutColumnData('trData', i+1, TableDataArray[i].trData);
+  end;
+  TableDataArray:=nil;
+end;
+
+function TForm1.isChanged(sport:TSport):Boolean;
+begin
+  //writeMemo(sport, getSportFileName(sport)+' MD5='+MD5(getSportFileName(sport))+', '+getLastSportFileName(sport)+' MD5='+MD5(getLastSportFileName(sport)));
+  if FileExists(getLastSportFileName(sport)) then
+  begin
+    if (MD5(getSportFileName(sport)) <> MD5(getLastSportFileName(sport))) then
+    begin
+      Result:=True;
+    end
+    else
+    begin
+      Result:=False;
+    end;
+  end
+  else
+  begin
+    Result:=True;
+  end;
+end;
+
+function TForm1.getLiveTable(sport:TSport):WideString;
+var
+  Elem: IHTMLElement;
+  tempString: WideString;
+begin
+  case sport of
+    soccer:
+    begin
+      Elem := getElementById(wb_soccer.Document, 'live') as IHTMLElement;
+      if Assigned(Elem) then
+      begin
+        tempString:=Elem.innerHTML;
+        Result:=tempstring;
+      end;
+    end;
+    nba:
+    begin
+      Elem := getElementById(wb_nba.Document, 'live') as IHTMLElement;
+      if Assigned(Elem) then
+      begin
+        tempString:=Elem.innerHTML;
+        Result:=tempstring;
+      end;
+    end;
+  end;
+end;
+
+function TForm1.getElementById(const Doc: IDispatch; const Id: string): IDispatch;
+var
+  Document: IHTMLDocument2;     // IHTMLDocument2 interface of Doc
+  Body: IHTMLElement2;          // document body element
+  Tags: IHTMLElementCollection; // all tags in document body
+  Tag: IHTMLElement;            // a tag in document body
+  I: Integer;                   // loops thru tags in document body
+begin
+  Result := nil;
+  // Check for valid document: require IHTMLDocument2 interface to it
+  if not Supports(Doc, IHTMLDocument2, Document) then
+    raise Exception.Create('Invalid HTML document');
+
+  // Check for valid body element: require IHTMLElement2 interface to it
+  //if not Supports(Document.body, IHTMLElement2, Body) then
+  //  raise Exception.Create('Can''t find <body> element');
+
+  // Get all tags in body element ('*' => any tag name)
+  //Tags := Body.getElementsByTagName('*');
+  Body:=Document.body AS IHTMLElement2;
+  Tags := Body.getElementsByTagName('*');
+
+  // Scan through all tags in body
+  for I := 0 to Pred(Tags.length) do
+  begin
+    // Get reference to a tag
+    Tag := Tags.item(I, EmptyParam) as IHTMLElement;
+    // Check tag's id and return it if id matches
+    if AnsiSameText(Tag.id, Id) then
+    begin
+      Result := Tag;
+      Break;
+    end;
+  end;
+end;
+
+function TForm1.getWebBrowserHTML(const WebBrowser: TWebBrowser): WideString;
+var
+  doc:IHTMLDocument3;
+begin
+  doc:=WebBrowser.Document as IHTMLDocument3;
+  Result:=doc.documentElement.innerHTML;
+end;
+
+function TForm1.saveToFile(sport:TSport):Boolean;
+var
+  Strings:TStrings;
+  WebBrowser:TWebBrowser;
+  FileName:WideString;
+begin
+  Strings := TStringList.Create;
+  WebBrowser:=getSportWebBrowser(sport);
+  FileName:=getSportFileName(sport);
+  try
+    //Strings.Add(getLiveTable(sport));
+    Strings.Add(GetWebBrowserHTML(WebBrowser));
+    Strings.SaveToFile(FileName);
+    Strings.Free;
+    Result:=True;
+  except
+    writeMemo(sport,FileName+' ..........存檔失敗 !');
+    Strings.Free;
+    Result:=False;
+  end;
+end;
+
+procedure TForm1.tmr_nbaTimer(Sender: TObject);
+begin
+  doFetch(nba);
+end;
+
+procedure TForm1.tmr_soccerTimer(Sender: TObject);
+begin
+  doFetch(soccer);
+end;
+
+function TForm1.getSportFileName(sport:TSport):string;
+var
+  formatteddatetime:string;
+begin
+  DateTimeToString(formatteddatetime,'yyyymmddhhnnss',now);
+  case sport of
+    soccer: Result:='soccer_ad.htm';
+    nba: Result:='nba_ad.htm';
+  end;
+end;
+
+function TForm1.getLastSportFileName(sport:TSport):string;
+begin
+  case sport of
+    soccer: Result:='soccer_last_ad.htm';
+    nba: Result:='nba_last_ad.htm';
+  end;
+end;
+
+function TForm1.getSportName(sport:TSport):string;
+begin
+  case sport of
+    soccer: Result:='足球';
+    nba: Result:='籃球';
+  end;
+end;
+
+function TForm1.getSportWebBrowser(sport:TSport):TWebBrowser;
+begin
+  case sport of
+    soccer: Result:=wb_soccer;
+    nba: Result:=wb_nba;
+  end;
+end;
+
+procedure TForm1.writeMemo(sport:TSport;content:Widestring);
+begin
+  case sport of
+    soccer: mm_soccer.Lines.Add('['+formatdatetime('yyyy-mm-dd hh:nn:ss',now)+'] '+content);
+    nba: mm_nba.Lines.Add('['+formatdatetime('yyyy-mm-dd hh:nn:ss',now)+'] '+content);
+  end;
+end;
+
+function TForm1.writeDB(sport:TSport):boolean;
+var
+  iDocument:IHTMLDocument3;
+  iTable:IDispatch;
+  iTableLive:IHTMLTable;
+  iRow:IHTMLTableRow;
+  iCell:IHTMLTableCell;
+  changetime:TDateTime;
+  trid:string;
+  trdata:WideString;
+  tmp:IHTMLElement;
+  i,j:integer;
+begin
+  case sport of
+    soccer:
+    begin
+      changetime:=now();
+      //mm_soccer.Lines.Add(wb_soccer.OleObject.document.getElementByID('table_live').innerHTML);
+      iDocument:=wb_soccer.document as IHTMLDocument3;
+      iTable:=wb_soccer.OleObject.document.getElementByID('table_live');
+      iTable.QueryInterface(IHTMLTable, iTableLive);
+      //MyQuery1.SQL.Text := 'INSERT LiveTableData(Sport, ChangeTime, trID, trData) VALUES (:Sport, :ChangeTime, :trID, :trData)';
+      //MyQuery1.ParamByName('Sport').DataType := ftString;
+      //MyQuery1.ParamByName('ChangeTime').DataType := ftDateTime;
+      //MyQuery1.ParamByName('trID').DataType := ftString;
+      //MyQuery1.ParamByName('trData').DataType := ftWideString;
+      Fulldata.Sport:='soccer';
+      FullData.ChangeTime:=changetime;
+      FullData.Data:=iDocument.documentElement.outerHTML;
+      MyQuery1.SQL.Text:='INSERT LiveFullData(Sport, ChangeTime, Data) VALUES(:Sport, :ChangeTime, :Data)';
+      MyQuery1.ParamByName('Sport').DataType := ftString;
+      MyQuery1.ParamByName('ChangeTime').DataType := ftDateTime;
+      MyQuery1.ParamByName('Data').DataType := ftWideMemo;
+      MyQuery1.ParamByName('Sport').AsString:=FullData.Sport;
+      MyQuery1.ParamByName('ChangeTime').AsDateTime:=FullData.ChangeTime;
+      MyQuery1.ParamByName('Data').AsWideString:=FullData.Data;
+      MyQuery1.ExecSQL;
+      mm_soccer.Lines.Add(FullData.Data);
+      SetLength(TableDataArray, iTableLive.rows.length);
+      //MyQuery1.Params.ValueCount:=iTableLive.rows.length;
+      for i:=0 to iTableLive.rows.length - 1 do
+      begin
+        iRow:=iTableLive.rows.item(i,i) as IHTMLTableRow;
+        tmp:=iRow as IHTMLElement;
+        trid:=trim(tmp.id);
+        trdata:=trim(tmp.outerHTML);
+        TableDataArray[i].Sport:='soccer';
+        TableDataArray[i].ChangeTime:=changetime;
+        TableDataArray[i].trID:=trid;
+        TableDataArray[i].trData:=trdata;
+        //mm_soccer.Lines.Add('============================================================');
+        //mm_soccer.Lines.Add(trid);
+        //mm_soccer.Lines.Add('============================================================');
+        //mm_soccer.Lines.Add(trdata);
+        //MyQuery1.ParamByName('ChangeTime')[i].AsDateTime := changetime;
+        //MyQuery1.ParamByName('trID')[i].AsString:=trid;
+        //MyQuery1.ParamByName('trData')[i].AsWideString:=trdata;
+        //MyQuery1.ParamByName('trData')[i].AsWideString:='aaaaaa這是中文字bbbbb,會有亂碼嗎?';
+        //for j:=0 to iRow.cells.length - 1 do
+        //begin
+          //tmp:=iRow.cells.item(j, j) as IHTMLElement;
+          //mm_soccer.Lines.Add(tmp.innerHTML);
+        //end;
+      end;
+      //MyQuery1.Execute(iTableLive.rows.length);
+      ml_LiveTableData.Load;
+      //ml_LiveFullData.Load;
+      Result:=True;
+    end;
+    nba:
+    begin
+      {
+      Elem := getElementById(wb_nba.Document, 'table_live') as IHTMLElement;
+      if Assigned(Elem) then
+      begin
+        tempString:=Elem.innerHTML;
+        Result:=tempstring;
+      end;
+      }
+    end;
+  end;
+end;
+
+procedure TForm1.Button1Click(Sender: TObject);
+begin
+  writeDB(soccer);
+end;
+
+procedure TForm1.doFetch(sport:TSport);
+begin
+  saveToFile(sport);
+  if isChanged(sport) then
+  begin
+    writeMemo(sport,' 資料有變動, 將資料寫入資料庫中........ !');
+    if (writeDB(sport)) then
+      writeMemo(sport, ' 資料寫入資料庫成功 !')
+    else
+      writeMemo(sport, ' 資料寫入資料庫.............失敗 !');
+    if FileExists(getLastSportFileName(sport)) then
+    begin
+      DeleteFile(getLastSportFileName(sport));
+    end;
+    RenameFile(getSportFileName(sport),getLastSportFileName(sport));
+  end
+  else
+  begin
+    writeMemo(sport,'Nothing Change');
+  end;
+end;
+
+
+end.

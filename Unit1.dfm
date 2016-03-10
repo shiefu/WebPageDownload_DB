@@ -118,8 +118,6 @@ object Form1: TForm1
           TabOrder = 1
           OnDocumentComplete = wb_soccerDocumentComplete
           ExplicitTop = 37
-          ExplicitWidth = 1166
-          ExplicitHeight = 574
           ControlData = {
             4C00000057760000553500000000000000000000000000000000000000000000
             000000004C000000000000000000000001000000E0D057007335CF11AE690800
